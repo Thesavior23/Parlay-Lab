@@ -108,7 +108,7 @@ def evaluate_prop(stat, t, logs_cur, logs_all, ctx):
     sd = statistics.pstdev(recent) if len(recent) >= 5 else math.sqrt(max(season_avg, 1)) + 1
     sd = max(sd, 0.8)
     floor10 = min(v10)
-    rest = days_between(logs_all[0]["date"], ctx["day"])
+    rest = 1 if ctx.get("force_b2b") else days_between(logs_all[0]["date"], ctx["day"])
 
     # ---- projection
     parts = [(l10_avg, 0.40), (season_avg, 0.35)]
@@ -433,7 +433,7 @@ def pos_group(pos):
     return "G"
 
 
-def conflicts(leg, chosen):
+def conflicts(leg, chosen, max_per_game=2):
     """Returns a reason string if `leg` clashes with already chosen legs."""
     for c in chosen:
         if leg["game_id"] == c["game_id"] and leg["kind"] == "game" and c["kind"] == "game":
@@ -445,7 +445,7 @@ def conflicts(leg, chosen):
                     and pos_group(leg["pos"]) == pos_group(c["pos"])):
                 return "teammates fighting for the same stat"
     same_game = sum(1 for c in chosen if c["game_id"] == leg["game_id"])
-    if same_game >= 2:
+    if same_game >= max_per_game:
         return "too many picks from one game"
     return None
 
@@ -528,6 +528,18 @@ def build_parlays(candidates):
         if len(other) == 2 and not conflicts(other[1], [g, other[0]]):
             out.append(combo("Game + players mix", [g] + other,
                              "One safe game pick with two strong player picks from other games."))
+    # big parlays: one pick per player, the safest ones, max 3 from any one game
+    for n in (10, 15):
+        legs = []
+        for c in props:
+            if not conflicts(c, legs, max_per_game=3):
+                legs.append(c)
+            if len(legs) == n:
+                break
+        if len(legs) == n:
+            out.append(combo(f"Big {n}-player parlay", legs,
+                             f"The {n} safest player picks, one per player. Even with safe picks, "
+                             f"{n} legs is a long shot — the payout is big because the chance is small."))
     ast_pts = None
     for x in props:
         if x["stat"] != "ast":

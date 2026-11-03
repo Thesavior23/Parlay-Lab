@@ -37,8 +37,10 @@ It also builds parlay ideas, and the next morning it checks how every pick did
 3. On the new repo page, click **uploading an existing file**. Drag in **everything
    inside this folder** (including the `.github` and `docs` folders), then
    **Commit changes**.
-   - Tip: on a Mac, hidden folders like `.github` don't show in Finder. Press
-     Cmd + Shift + . (period) to show them.
+   - Hidden folders like `.github` often don't upload. Check that the repo shows a
+     `.github` folder. If not: **Add file → Create new file**, type the name
+     `.github/workflows/update.yml`, paste in the contents of that file from this
+     folder, then **Commit changes**.
 4. Turn on the website: **Settings** → **Pages** → under *Branch* pick `main` and
    the `/docs` folder → **Save**.
 5. Let the robot save files: **Settings** → **Actions** → **General** → at the
@@ -48,7 +50,8 @@ It also builds parlay ideas, and the next morning it checks how every pick did
 7. Open `https://YOUR-GITHUB-NAME.github.io/parlay-lab/` on your phone.
    In Safari tap **Share → Add to Home Screen** so it opens like an app.
 
-After that it updates by itself 3 times a day, on San Antonio (Central) time:
+Each update builds **today's picks and tomorrow's early picks**. Use the date menu at the
+top right to switch between them. After that it updates by itself 3 times a day, on San Antonio (Central) time:
 about 9 AM, 3 PM and 4:30 PM (one hour later in summer). Game times on the site show in CT.
 
 ## Test it on a computer (optional)

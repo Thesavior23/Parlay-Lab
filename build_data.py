@@ -69,7 +69,9 @@ def find_injury(inj_list, player):
     return None
 
 
-def build(day, espn, data_dir):
+def build(day, espn, data_dir, prev_teams=None):
+    """prev_teams: teams playing the day before that haven't played yet (for tomorrow's early look)."""
+    prev_teams = prev_teams or set()
     season = season_for(day)
     ds = day.isoformat()
     warnings = []
@@ -98,6 +100,9 @@ def build(day, espn, data_dir):
         sched_cur[t] = [x for x in sched_cur[t] if x["date"] < ds]
 
     profiles = {t: A.team_profile(sched_cur[t], sched_prev[t], ds) for t in tids}
+    for t in tids:
+        if teams[t]["abbr"] in prev_teams:
+            profiles[t]["rest"] = 1  # plays tonight too, so tomorrow is a back-to-back
     league_pf = A.mean(p["pf"] for p in profiles.values()) or 112.0
 
     # ---- player game logs (this season + last season)
@@ -193,6 +198,7 @@ def build(day, espn, data_dir):
                     players_out.setdefault(g["id"], []).append(pl["name"])
                     continue
                 ctx = {"day": ds, "home": side == "home", "opp": opp["abbr"], "status": i["status"],
+                       "force_b2b": me["abbr"] in prev_teams,
                        "key_teammates_out": [n for n in key_out if n != pl["name"]],
                        "opp_def_factor": opp_prof["pa"] / league_pf,
                        "pace_factor": pred["pace_factor"], "team_margin": team_margin}
@@ -232,9 +238,90 @@ def build(day, espn, data_dir):
     picks.sort(key=lambda x: (-x["p"], -x["t"]))
     parlays = A.build_parlays([l for l in all_legs if not (l["kind"] == "prop" and l["p"] < A.SAFE_P)])
     log(f"  {len(picks)} player picks, {len(parlays)} parlay ideas")
+    news = build_news(espn, ds, games, teams, rosters, info, profiles, prev_teams)
     return {"date": ds, "generated": datetime.now(timezone.utc).isoformat(), "season": season,
             "games": out_games, "players": players, "picks": picks, "parlays": parlays,
-            "warnings": warnings}
+            "news": news, "warnings": warnings}
+
+
+def build_news(espn, ds, games, teams, rosters, info, profiles, prev_teams):
+    """Injury report, back-to-backs, rested teams, hot/cold players and headlines."""
+    matchup = {}
+    for g in games:
+        for side in ("home", "away"):
+            other = g["away" if side == "home" else "home"]
+            matchup[g[side]["id"]] = ("vs " if side == "home" else "@ ") + other["abbr"]
+
+    injuries, big = [], []
+    for tid, t in teams.items():
+        rows = []
+        for pl in rosters[tid]:
+            i = info.get(pl["id"])
+            if not i or not i["status"]:
+                continue
+            key = i["ppg"] >= 12 or i["mpg"] >= 24
+            fresh = (i["last_played_days"] or 99) <= 10
+            row = {"name": pl["name"], "status": i["status"], "detail": i["inj_detail"] or "",
+                   "ppg": round(i["ppg"], 1), "key": key, "fresh": fresh}
+            rows.append(row)
+            if key and fresh and "out" in i["status"].lower():
+                big.append({"team": t["abbr"], "name": pl["name"], "ppg": round(i["ppg"], 1),
+                            "detail": i["inj_detail"] or ""})
+        rows.sort(key=lambda r: (not r["key"], -r["ppg"]))
+        if rows:
+            injuries.append({"team": t["abbr"], "name": t["name"], "matchup": matchup[tid], "players": rows})
+    injuries.sort(key=lambda x: x["team"])
+    big.sort(key=lambda x: -x["ppg"])
+
+    b2b, rested = [], []
+    for tid, t in teams.items():
+        rest = profiles[tid]["rest"]
+        if rest == 1:
+            b2b.append({"team": t["abbr"], "name": t["name"], "matchup": matchup[tid],
+                        "note": "Plays tonight too, so this is the 2nd night in a row" if t["abbr"] in prev_teams
+                        else "Played last night — 2nd night in a row"})
+        elif rest is not None and rest >= 3:
+            rested.append({"team": t["abbr"], "name": t["name"], "matchup": matchup[tid],
+                           "note": f"{rest - 1} days off"})
+
+    hot, cold = [], []
+    for tid, t in teams.items():
+        for pl in rosters[tid]:
+            i = info.get(pl["id"])
+            if not i or i["mpg10"] < 20 or (i["status"] and "out" in i["status"].lower()):
+                continue
+            base = i["cur"] if len(i["cur"]) >= 6 else i["all"][:20]
+            last5 = i["all"][:5]
+            if len(base) < 5 or len(last5) < 5:
+                continue
+            for stat, label in (("pts", "points"), ("reb", "rebounds"), ("ast", "assists")):
+                avg = sum(g[stat] for g in base) / len(base)
+                l5 = sum(g[stat] for g in last5) / 5
+                need = 3 if stat == "pts" else 2
+                row = {"name": pl["name"], "team": t["abbr"], "matchup": matchup[tid], "stat": label,
+                       "l5": round(l5, 1), "avg": round(avg, 1)}
+                if l5 >= avg * 1.2 and l5 - avg >= need:
+                    hot.append(dict(row, diff=round(l5 - avg, 1)))
+                elif l5 <= avg * 0.8 and avg - l5 >= need:
+                    cold.append(dict(row, diff=round(l5 - avg, 1)))
+    hot.sort(key=lambda r: -r["diff"])
+    cold.sort(key=lambda r: r["diff"])
+
+    headlines = []
+    try:
+        data = espn.f.get("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news",
+                          {"limit": 25}, ttl=900)
+        for a in data.get("articles", []) or []:
+            link = ((a.get("links") or {}).get("web") or {}).get("href")
+            if not a.get("headline") or not link:
+                continue
+            headlines.append({"title": a["headline"], "desc": a.get("description") or "",
+                              "link": link, "published": a.get("published")})
+    except Exception as e:
+        log("  ! headlines failed:", e)
+
+    return {"big_injuries": big[:12], "injuries": injuries, "b2b": b2b, "rested": rested,
+            "hot": hot[:10], "cold": cold[:8], "headlines": headlines[:15]}
 
 
 def settle(day, espn, data_dir):
@@ -328,10 +415,22 @@ def main():
     espn = ESPN(fetcher)
     data_dir = args.out
 
+    # today's picks
     slate = build(day, espn, data_dir)
     slate["demo"] = bool(args.demo)
+    slate["early"] = False
     write_json(os.path.join(data_dir, "slates", f"{day.isoformat()}.json"), slate)
-    write_json(os.path.join(data_dir, "latest.json"), slate)
+
+    # tomorrow's early look (teams playing tonight will be on a back-to-back)
+    tomorrow = day + timedelta(days=1)
+    playing_tonight = {g[s]["abbr"] for g in slate["games"] if g.get("state") != "post" for s in ("home", "away")}
+    slate2 = build(tomorrow, espn, data_dir, prev_teams=playing_tonight)
+    slate2["demo"] = bool(args.demo)
+    slate2["early"] = True
+    write_json(os.path.join(data_dir, "slates", f"{tomorrow.isoformat()}.json"), slate2)
+
+    # the page opens on today, or on tomorrow when there are no games today
+    write_json(os.path.join(data_dir, "latest.json"), slate if slate["games"] else slate2)
 
     # check results for the last 3 days (games finish late, stats get fixed)
     hist_path = os.path.join(data_dir, "history.json")
