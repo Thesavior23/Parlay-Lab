@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10151f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Parlay Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column scoreboard-style feed, sticky header with tabs, a floating slip button. */
+:root {
+  --bg: #eef1f5; --panel: #ffffff; --ink: #141a24; --muted: #5d6878; --line: #d9dee6;
+  --accent: #d9581e; --accent-ink: #ffffff; --chip: #e4e8ee;
+  --good: #1d8a4e; --good-bg: #e3f4ea; --warn: #a86a00; --warn-bg: #fbf0d9; --bad: #c0392b; --bad-bg: #fbe6e3;
+  --info-bg: #e8edf4;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10151f; --panel: #182030; --ink: #e8ecf2; --muted: #93a0b4; --line: #27324a;
+  --accent: #f07a3e; --accent-ink: #10151f; --chip: #222c40;
+  --good: #4cc983; --good-bg: #173326; --warn: #f0b443; --warn-bg: #3a2e14; --bad: #f2766a; --bad-bg: #3d1f1d;
+  --info-bg: #1f2a3e; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #10151f; --panel: #182030; --ink: #e8ecf2; --muted: #93a0b4; --line: #27324a;
+  --accent: #f07a3e; --accent-ink: #10151f; --chip: #222c40;
+  --good: #4cc983; --good-bg: #173326; --warn: #f0b443; --warn-bg: #3a2e14; --bad: #f2766a; --bad-bg: #3d1f1d;
+  --info-bg: #1f2a3e; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--body); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); }
+.top { display: flex; align-items: center; gap: 12px; padding-block: 10px 6px; }
+.brand { font: 700 26px/1 var(--display); letter-spacing: .02em; text-transform: uppercase; }
+.brand b { color: var(--accent); }
+.top .sp { flex: 1; }
+#day { background: var(--chip); border: 0; border-radius: 8px; padding: 6px 8px; max-width: 46vw; }
+nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-block: 2px 0; }
+nav::-webkit-scrollbar { display: none; }
+nav button { background: none; border: 0; padding: 8px 9px 10px; font: 600 15px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav .count { display: inline-block; min-width: 18px; padding: 1px 5px; margin-left: 4px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 500 11px/1.4 var(--mono); }
+
+main { padding-block: 14px 110px; display: grid; gap: 12px; }
+.meta { color: var(--muted); font-size: 13px; }
+.banner { padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
+.banner.info { background: var(--info-bg); color: var(--muted); }
+
+.filters { display: grid; gap: 8px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.row2 { display: flex; gap: 8px; }
+.row2 > * { flex: 1; min-width: 0; }
+.field { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.ph { display: flex; gap: 12px; align-items: flex-start; }
+.ph .who { flex: 1; min-width: 0; }
+.name { font-weight: 600; font-size: 16px; }
+.sub { color: var(--muted); font-size: 13px; }
+.line { text-align: right; }
+.line .big { font: 700 34px/0.95 var(--display); }
+.line .stat { font: 600 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; padding: 2px 8px; font: 500 13px/1.6 var(--mono); }
+.g-A { background: var(--good-bg); color: var(--good); }
+.g-B { background: var(--info-bg); color: var(--ink); }
+.g-C { background: var(--warn-bg); color: var(--warn); }
+.g-D { background: var(--bad-bg); color: var(--bad); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.bars { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; align-items: end; height: 54px; position: relative; }
+.bars .b { border-radius: 3px 3px 0 0; min-height: 3px; position: relative; }
+.bars .b.hit { background: var(--good); }
+.bars .b.miss { background: var(--bad); opacity: .75; }
+.bars .b { cursor: pointer; outline: none; }
+.bars .b::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--bg); font: 500 12px/1.3 var(--mono); padding: 4px 7px; border-radius: 6px;
+  white-space: nowrap; opacity: 0; pointer-events: none; z-index: 3; transition: opacity .1s; }
+.bars .b:nth-child(-n+2)::after { left: 0; transform: none; }
+.bars .b:nth-child(n+9)::after { left: auto; right: 0; transform: none; }
+.bars .b:hover::after, .bars .b:focus-visible::after, .bars .b.show::after { opacity: 1; }
+.bars .b:hover, .bars .b.show, .bars .b:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
+.bars .thr { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--ink); opacity: .45; }
+.bars-lab { display: flex; justify-content: space-between; font: 500 11px/1 var(--mono); color: var(--muted); }
+
+details summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 14px; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details[open] summary { margin-bottom: 8px; }
+.reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.reasons li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: 14px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; }
+.k-good .dot { background: var(--good); } .k-warn .dot { background: var(--warn); }
+.k-bad .dot { background: var(--bad); } .k-info .dot { background: var(--muted); }
+.ladder { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ladder span { font: 500 12px/1.6 var(--mono); background: var(--chip); border-radius: 6px; padding: 1px 7px; }
+.ladder span.on { background: var(--accent); color: var(--accent-ink); }
+.vs { overflow-x: auto; }
+.vs table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.vs td, .vs th { padding: 3px 10px 3px 0; text-align: left; white-space: nowrap; }
+.vs th { color: var(--muted); font-weight: 500; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 12px; font-weight: 500; font-size: 14px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.sm { text-decoration: none; color: var(--muted); font-size: 13px; padding: 5px 10px; }
+.btn.added { background: var(--good-bg); color: var(--good); border-color: transparent; }
+
+.gm-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.teams { font: 700 24px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.winbar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; font: 500 12px/26px var(--mono); }
+.winbar div { padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.winbar .h { background: var(--accent); color: var(--accent-ink); text-align: right; }
+.winbar .a { background: var(--chip); }
+.gpick { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.gpick .t { flex: 1; min-width: 0; }
+.gpick .t div:first-child { font-weight: 600; }
+.small { font-size: 13px; color: var(--muted); }
+.sec-title { font: 700 18px/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em; margin: 6px 0 0; }
+.leg { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.leg .x { border: 0; background: none; color: var(--bad); font-size: 18px; line-height: 1; padding: 0 4px; }
+.total { display: flex; justify-content: space-between; align-items: baseline; }
+.total .big { font: 700 32px/1 var(--display); }
+.helps { color: var(--good); font-size: 13px; }
+.warnline { color: var(--warn); font-size: 13px; }
+.res-hit { color: var(--good); font-weight: 600; } .res-miss { color: var(--bad); font-weight: 600; }
+.res-pending, .res-void { color: var(--muted); }
+.statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.statgrid div { background: var(--chip); border-radius: 10px; padding: 10px; }
+.statgrid b { display: block; font: 700 26px/1 var(--display); }
+.empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+
+.fab { position: fixed; right: max(16px, calc(env(safe-area-inset-right, 0px) + 12px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+  background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 12px 18px; font: 700 17px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 7; }
+@media (prefers-reduced-motion: no-preference) { .card { animation: up .25s ease both; } @keyframes up { from { transform: translateY(4px); } to { transform: none; } } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">Parlay <b>Lab</b></div>
+      <div class="sp"></div>
+      <select id="day" aria-label="Pick a day"></select>
+    </div>
+    <nav role="tablist" id="tabs">
+      <button role="tab" data-tab="picks" aria-selected="true">Player picks</button>
+      <button role="tab" data-tab="games" aria-selected="false">Games</button>
+      <button role="tab" data-tab="parlays" aria-selected="false">Parlay ideas</button>
+      <button role="tab" data-tab="slip" aria-selected="false">My slip<span class="count" id="slipcount" hidden></span></button>
+      <button role="tab" data-tab="record" aria-selected="false">Record</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="empty">Loading today's picks…</div></main>
+<button class="fab" id="fab" hidden>Slip</button>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  const STAT = { pts: "Points", reb: "Rebounds", ast: "Assists", fg3m: "3-pointers", pra: "Pts+Reb+Ast" };
+  const S = { tab: "picks", slate: null, stat: "all", grade: "AB", game: "all", q: "", slip: [], saved: [], history: null, results: {} };
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pct = (p) => Math.round(p * 100) + "%";
+  const SM = (q) => "https://www.statmuse.com/nba/ask?q=" + encodeURIComponent(q);
+  const smLink = (q, text) => `<a class="btn sm" href="${SM(q)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+  const TZ = "America/Chicago";  // San Antonio time
+  const ct = (iso, opts) => { try { return new Date(iso).toLocaleString("en-US", Object.assign({ timeZone: TZ }, opts)); } catch (e) { return new Date(iso).toLocaleString(); } };
+  const tipoff = (g) => g.state === "pre" && g.time ? ct(g.time, { hour: "numeric", minute: "2-digit" }) + " CT" : (g.status || "");
+  const grade = (p) => (p >= 0.8 ? "A" : p >= 0.7 ? "B" : p >= 0.6 ? "C" : "D");
+
+  function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  S.slip = store("slip") || []; S.saved = store("saved") || [];
+
+  async function getJSON(path) {
+    if (window.__DATA__) return window.__DATA__[path] || null;
+    try { const r = await fetch(path + "?t=" + Date.now()); return r.ok ? r.json() : null; } catch (e) { return null; }
+  }
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 1800); }
+
+  // ---------- slip
+  function inSlip(id) { return S.slip.some((l) => l.id === id); }
+  function addLeg(leg) {
+    if (inSlip(leg.id)) { S.slip = S.slip.filter((l) => l.id !== leg.id); toast("Removed from slip"); }
+    else { S.slip.push(leg); toast("Added to slip"); }
+    store("slip", S.slip); render();
+  }
+  function propLeg(p, t, prob) {
+    return { id: `${S.slate.date}:${p.pid}:${p.stat}:${t}`, kind: "prop", date: S.slate.date, pid: p.pid, name: p.name, team: p.team,
+      stat: p.stat, t, p: prob, game_id: p.game_id, label: `${p.name} ${t}+ ${STAT[p.stat].toLowerCase()}` };
+  }
+  function gameLeg(g, pk) { return { id: pk.id, kind: "game", date: S.slate.date, game_id: g.id, leg: pk.leg, p: pk.p, label: pk.label, matchup: pk.matchup }; }
+  function slipWarnings(legs) {
+    const w = []; const byP = {}, byG = {};
+    legs.forEach((l) => { if (l.pid) byP[l.pid] = (byP[l.pid] || 0) + 1; byG[l.game_id] = (byG[l.game_id] || 0) + 1; });
+    if (Object.values(byP).some((n) => n > 1)) w.push("Same player twice. If he has a bad night, both legs lose.");
+    if (Object.values(byG).some((n) => n > 2)) w.push("3+ picks from one game. One weird game can sink the whole parlay.");
+    if (legs.length > 4) w.push("Every extra leg lowers your chance a lot. 2-4 legs is the sweet spot.");
+    return w;
+  }
+
+  // ---------- views
+  function viewPicks() {
+    const s = S.slate; const players = s.players || {};
+    const games = s.games || [];
+    let list = s.picks.filter((p) => (S.stat === "all" || p.stat === S.stat) && (S.game === "all" || p.game_id === S.game));
+    if (S.grade === "A") list = list.filter((p) => p.grade === "A");
+    else if (S.grade === "AB") list = list.filter((p) => p.grade === "A" || p.grade === "B");
+    if (S.q) list = list.filter((p) => p.name.toLowerCase().includes(S.q.toLowerCase()));
+    const chips = [["all", "All"]].concat(Object.entries(STAT)).map(([k, v]) => `<button class="chip" data-stat="${k}" aria-pressed="${S.stat === k}">${v}</button>`).join("");
+    const gopts = `<option value="all">All games</option>` + games.map((g) => `<option value="${g.id}" ${S.game === g.id ? "selected" : ""}>${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</option>`).join("");
+    let h = `<div class="filters"><div class="chips">${chips}</div>
+      <div class="row2"><select class="field" id="fgame" aria-label="Game">${gopts}</select>
+      <select class="field" id="fgrade" aria-label="Safety"><option value="A" ${S.grade === "A" ? "selected" : ""}>Safest only (A)</option><option value="AB" ${S.grade === "AB" ? "selected" : ""}>A and B</option><option value="all" ${S.grade === "all" ? "selected" : ""}>Show all</option></select></div>
+      <input class="field" id="fq" type="search" placeholder="Search a player" value="${esc(S.q)}" aria-label="Search a player"></div>
+      <div class="meta">${list.length} picks · the number shown is the highest one we think he hits at least 80% of the time</div>`;
+    if (!list.length) h += `<div class="empty">No picks match these filters.</div>`;
+    h += list.slice(0, 150).map((p) => pickCard(p, players[p.pid])).join("");
+    return h;
+  }
+
+  function bars(vals, t, games) {
+    if (!vals.length) return "";
+    const shown = vals.slice(0, 10).reverse();
+    const gs = (games || []).slice(0, 10).reverse();
+    const tip = (v, i) => { const g = gs[i]; if (!g) return String(v);
+      const d = new Date(g.d + "T12:00").toLocaleDateString([], { month: "short", day: "numeric" });
+      return `${v} · ${g.h ? "vs" : "@"} ${g.o} · ${d}`; };
+    const max = Math.max(t * 1.25, ...shown, 1);
+    const thr = (t / max) * 100;
+    return `<div><div class="bars" aria-label="Last ${shown.length} games, oldest to newest">${shown.map((v, i) => `<div class="b ${v >= t ? "hit" : "miss"}" tabindex="0" style="height:${Math.max(4, (v / max) * 100)}%" data-tip="${esc(tip(v, i))}" aria-label="${esc(tip(v, i))}"></div>`).join("")}
+      <div class="thr" style="bottom:${thr}%"></div></div>
+      <div class="bars-lab"><span>${shown.length} games ago</span><span>last game</span></div></div>`;
+  }
+
+  function pickCard(p, pl) {
+    const loc = p.home ? "Home" : "Away";
+    const vsHits = p.vs_opp.filter((x) => x.v >= p.t).length;
+    const reasons = p.reasons.map((r) => `<li class="k-${r.k}"><span class="dot"></span><span>${esc(r.t)}</span></li>`).join("");
+    const ladder = p.ladder.map((l) => `<span class="${l.t === p.t ? "on" : ""}">${l.t}+ ${pct(l.p)}</span>`).join("");
+    const vsRows = p.vs_opp.length ? `<div class="vs"><table><tr><th>Date vs ${esc(p.opp)}</th><th>Where</th><th>${STAT[p.stat]}</th></tr>${p.vs_opp.map((x) => `<tr><td>${esc(x.d)}</td><td>${x.h ? "Home" : "Away"}</td><td class="${x.v >= p.t ? "res-hit" : "res-miss"}">${x.v}</td></tr>`).join("")}</table></div>` : "";
+    const id = `${S.slate.date}:${p.pid}:${p.stat}:${p.t}`;
+    const bid = p.bold ? `${S.slate.date}:${p.pid}:${p.stat}:${p.bold.t}` : null;
+    return `<article class="card">
+      <div class="ph"><div class="who"><div class="name">${esc(p.name)}</div>
+        <div class="sub">${esc(p.team)} ${p.home ? "vs" : "@"} ${esc(p.opp)} · ${loc}${pl && pl.status ? ` · <span style="color:var(--warn)">${esc(pl.status)}</span>` : ""}</div>
+        <div style="margin-top:6px"><span class="pill g-${p.grade}">${pct(p.p)} chance · ${p.grade}</span></div></div>
+        <div class="line"><div class="big">${p.t}+</div><div class="stat">${STAT[p.stat]}</div></div></div>
+      <div class="facts"><span>Avg <b>${p.season_avg}</b></span><span>Last 10 <b>${p.hits10}/${p.n10}</b></span>${p.vs_opp.length ? `<span>vs ${esc(p.opp)} <b>${vsHits}/${p.vs_opp.length}</b></span>` : ""}<span>${p.home ? "Home" : "Road"} avg <b>${p.home ? p.split.home ?? "-" : p.split.away ?? "-"}</b></span><span>Projected <b>${p.proj}</b></span></div>
+      ${bars(p.last10, p.t, pl && pl.last10)}
+      <details><summary>Why this pick</summary><ul class="reasons">${reasons}</ul>${vsRows}
+        <div class="ladder">${ladder}</div>
+        <div class="actions" style="margin-top:10px">${smLink(`${p.name} ${STAT[p.stat].toLowerCase()} last 10 games`, "StatMuse: last 10")}${smLink(`${p.name} vs ${p.opp} last 5 games`, "StatMuse: vs " + p.opp)}${smLink(`${p.name} ${p.home ? "home" : "away"} games this season`, "StatMuse: " + (p.home ? "home" : "away"))}</div></details>
+      <div class="actions"><button class="btn ${inSlip(id) ? "added" : "primary"}" data-add-prop="${p.id}" data-t="${p.t}">${inSlip(id) ? "In slip ✓" : `Add ${p.t}+ to slip`}</button>
+        ${p.bold ? `<button class="btn ${inSlip(bid) ? "added" : ""}" data-add-prop="${p.id}" data-t="${p.bold.t}">${inSlip(bid) ? "In slip ✓" : `Bolder: ${p.bold.t}+ (${pct(p.bold.p)})`}</button>` : ""}</div>
+    </article>`;
+  }
+
+  function viewGames() {
+    const gs = S.slate.games;
+    if (!gs.length) return `<div class="empty">No games on this day.</div>`;
+    return gs.map((g) => {
+      const pr = g.pred; const ph = Math.round(pr.p_home * 100);
+      const fav = pr.fav === "home" ? g.home : g.away; const m = Math.abs(pr.margin_home);
+      const inj = ["away", "home"].map((s) => g.injuries[s].length ? `<div class="small"><b>${esc(g[s].abbr)} injuries:</b> ${g.injuries[s].map((i) => `${esc(i.name)} (${esc(i.status)})`).join(", ")}</div>` : "").join("");
+      const picks = g.picks.map((pk) => { const on = inSlip(pk.id); return `<div class="gpick"><div class="t"><div>${esc(pk.label)}</div><div class="small">${esc(pk.explain)}</div></div>
+        <span class="pill g-${pk.grade}">${pct(pk.p)}</span><button class="btn ${on ? "added" : ""}" data-add-game="${esc(pk.id)}" data-g="${g.id}">${on ? "✓" : "Add"}</button></div>`; }).join("");
+      return `<article class="card">
+        <div class="gm-head"><div class="teams">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</div><div class="small">${esc(tipoff(g))}</div></div>
+        <div class="small">${esc(g.away.name)} (${esc(g.away_profile.record)}) at ${esc(g.home.name)} (${esc(g.home_profile.record)})${g.venue ? " · " + esc(g.venue) : ""}</div>
+        <div class="winbar"><div class="a" style="width:${100 - ph}%">${esc(g.away.abbr)} ${100 - ph}%</div><div class="h" style="width:${ph}%">${esc(g.home.abbr)} ${ph}%</div></div>
+        <div><b>${pr.toss_up ? "Toss-up." : `Lean ${esc(fav.short)}`}</b> We project ${esc(fav.abbr)} by about ${m.toFixed(0)} points, with ${pr.total.toFixed(0)} total points.${pr.toss_up ? " Hard to call a winner, so the 'win by — NO' picks are safer here." : ""}</div>
+        ${inj}
+        <div><div class="sec-title">Suggested picks</div>${picks}</div>
+        <details><summary>What we looked at</summary><ul class="reasons">${pr.reasons.map((r) => `<li class="k-${r.k}"><span class="dot"></span><span>${esc(r.t)}</span></li>`).join("")}</ul>
+          <div class="actions" style="margin-top:10px">${smLink(`${g.away.name} vs ${g.home.name} last 5 games`, "StatMuse: head-to-head")}${smLink(`${g.home.name} home record this season`, "StatMuse: " + g.home.abbr + " at home")}${smLink(`${g.away.name} road record this season`, "StatMuse: " + g.away.abbr + " on the road")}</div></details>
+      </article>`;
+    }).join("");
+  }
+
+  function viewParlays() {
+    const ps = S.slate.parlays || [];
+    if (!ps.length) return `<div class="empty">Not enough strong picks today to build a parlay.</div>`;
+    return `<div class="meta">Built from the safest picks. Combined chance assumes the legs don't affect each other.</div>` + ps.map((c, i) => `<article class="card">
+      <div class="total"><div class="sec-title">${esc(c.name)}</div><span class="pill g-${grade(c.p)}">${pct(c.p)}</span></div>
+      <div class="small">${esc(c.note)}</div>
+      <div>${c.legs.map((l) => `<div class="leg"><span>${esc(l.label)} <span class="small">· ${esc(l.matchup)}</span></span><span class="small">${pct(l.p)}</span></div>`).join("")}</div>
+      ${c.helps.map((h) => `<div class="helps">+ ${esc(h)}</div>`).join("")}
+      <div class="actions"><button class="btn primary" data-load="${i}">Put these in my slip</button></div></article>`).join("");
+  }
+
+  function viewSlip() {
+    const legs = S.slip;
+    if (!legs.length) return `<div class="empty">Your slip is empty. Tap “Add” on any pick, then come back here.</div>`;
+    const p = legs.reduce((a, l) => a * l.p, 1);
+    const w = slipWarnings(legs);
+    const text = legs.map((l) => "• " + l.label).join("\n");
+    return `<article class="card"><div class="total"><div class="sec-title">My slip · ${legs.length} leg${legs.length > 1 ? "s" : ""}</div><div class="big">${pct(p)}</div></div>
+      <div class="small">Chance all legs hit (our estimate)</div>
+      <div>${legs.map((l) => `<div class="leg"><span>${esc(l.label)} <span class="small">· ${pct(l.p)}</span></span><button class="x" data-rm="${esc(l.id)}" aria-label="Remove">×</button></div>`).join("")}</div>
+      ${w.map((x) => `<div class="warnline">⚠ ${esc(x)}</div>`).join("")}
+      <div class="actions"><button class="btn primary" id="save">Save (I placed it)</button><button class="btn" id="copy">Copy list</button><button class="btn" id="clear">Clear</button></div>
+      <textarea id="copytext" class="field" rows="3" readonly hidden>${esc(text)}</textarea>
+      <div class="small">Place it yourself on Kalshi. Saved slips get checked automatically after the games.</div></article>`;
+  }
+
+  function legResult(l) {
+    const r = S.results[l.date]; if (!r) return "pending";
+    if (l.kind === "prop") { const x = r.players[l.pid]; if (!x) return r.games[l.game_id] ? "void" : "pending"; return x[l.stat] >= l.t ? "hit" : "miss"; }
+    const sc = r.games[l.game_id]; if (!sc) return "pending";
+    const mh = sc.home - sc.away; const m = l.leg.side === "home" ? mh : -mh;
+    if (l.leg.type === "ml") return m > 0 ? "hit" : "miss";
+    const covered = m > l.leg.line; return covered === (l.leg.pick === "YES") ? "hit" : "miss";
+  }
+  function viewRecord() {
+    let h = `<div class="sec-title">My saved slips</div>`;
+    if (!S.saved.length) h += `<div class="card small">Nothing saved yet. Build a slip and tap “Save” after you place it on Kalshi.</div>`;
+    let won = 0, done = 0;
+    h += S.saved.slice().reverse().map((sv, idx) => {
+      const res = sv.legs.map(legResult);
+      const all = res.includes("miss") ? "miss" : res.includes("pending") ? "pending" : "hit";
+      if (all !== "pending") { done++; if (all === "hit") won++; }
+      return `<article class="card"><div class="total"><div><b>${esc(sv.date)}</b> · ${sv.legs.length} legs · ${pct(sv.p)}</div><span class="res-${all}">${all.toUpperCase()}</span></div>
+        ${sv.legs.map((l, i) => `<div class="leg"><span>${esc(l.label)}</span><span class="res-${res[i]}">${res[i]}</span></div>`).join("")}
+        <div class="actions"><button class="btn" data-del="${S.saved.length - 1 - idx}">Delete</button></div></article>`;
+    }).join("");
+    if (done) h = `<div class="statgrid"><div><b>${won}/${done}</b><span class="small">my slips won</span></div><div><b>${S.saved.length}</b><span class="small">saved</span></div><div><b>${S.saved.length - done}</b><span class="small">waiting</span></div></div>` + h;
+    const hist = S.history || {}; const days = Object.keys(hist).sort().reverse();
+    let tp = 0, th = 0; const gb = {};
+    days.forEach((d) => { const s = hist[d].summary; tp += s.picks; th += s.hits; Object.entries(s.by_grade || {}).forEach(([g, v]) => { gb[g] = gb[g] || [0, 0]; gb[g][0] += v[0]; gb[g][1] += v[1]; }); });
+    h += `<div class="sec-title">How the app has done</div>`;
+    if (!tp) h += `<div class="card small">No finished days yet. Results show up the morning after games.</div>`;
+    else {
+      h += `<article class="card"><div class="statgrid"><div><b>${pct(th / tp)}</b><span class="small">player picks hit</span></div>${["A", "B"].map((g) => gb[g] ? `<div><b>${pct(gb[g][0] / gb[g][1])}</b><span class="small">grade ${g} (${gb[g][1]})</span></div>` : "").join("")}</div>
+        <div class="small">If grade A picks hit less than 80% over a few weeks, the app is too confident.</div>
+        ${days.slice(0, 14).map((d) => { const s = hist[d].summary; const pw = hist[d].parlays.filter((x) => x.result === "hit").length;
+          return `<div class="leg"><span>${esc(d)}</span><span class="small">${s.hits}/${s.picks} picks · ${pw}/${hist[d].parlays.length} parlay ideas won</span></div>`; }).join("")}</article>`;
+    }
+    return h;
+  }
+
+  function render() {
+    const s = S.slate; const m = $("#main");
+    document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
+    const c = $("#slipcount"); c.hidden = !S.slip.length; c.textContent = S.slip.length;
+    const fab = $("#fab"); fab.hidden = !S.slip.length || S.tab === "slip"; fab.textContent = `Slip · ${S.slip.length} · ${pct(S.slip.reduce((a, l) => a * l.p, 1))}`;
+    if (!s) { m.innerHTML = `<div class="empty">No data yet. The robot updates this page every day. Check back after it runs.</div>`; return; }
+    const upd = new Date(s.generated);
+    let head = s.demo ? `<div class="banner">DEMO MODE: these players and numbers are made up, for testing only.</div>` : "";
+    head += (s.warnings || []).map((w) => `<div class="banner">${esc(w)}</div>`).join("");
+    head += `<div class="meta">${s.games.length} games · updated ${ct(s.generated, { weekday: "short", hour: "numeric", minute: "2-digit" })} CT. Re-check injuries close to tip-off.</div>`;
+    const views = { picks: viewPicks, games: viewGames, parlays: viewParlays, slip: viewSlip, record: viewRecord };
+    m.innerHTML = head + views[S.tab]();
+  }
+
+  // ---------- events
+  document.addEventListener("click", (e) => {
+    const bar = e.target.closest(".bars .b");
+    document.querySelectorAll(".bars .b.show").forEach((b) => { if (b !== bar) b.classList.remove("show"); });
+    if (bar) { bar.classList.toggle("show"); return; }
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === "record") loadRecord(); render(); window.scrollTo(0, 0); return; }
+    if (t.id === "fab") { S.tab = "slip"; render(); window.scrollTo(0, 0); return; }
+    if (t.dataset.stat) { S.stat = t.dataset.stat; render(); return; }
+    if (t.dataset.addProp) { const p = S.slate.picks.find((x) => x.id === t.dataset.addProp); const tt = +t.dataset.t;
+      const prob = tt === p.t ? p.p : p.bold.p; addLeg(propLeg(p, tt, prob)); return; }
+    if (t.dataset.addGame) { const g = S.slate.games.find((x) => x.id === t.dataset.g); const pk = g.picks.find((x) => x.id === t.dataset.addGame); addLeg(gameLeg(g, pk)); return; }
+    if (t.dataset.load) { const c = S.slate.parlays[+t.dataset.load];
+      S.slip = c.legs.map((l) => l.kind === "prop" ? { id: l.id, kind: "prop", date: S.slate.date, pid: l.player_id, name: l.name, team: l.team, stat: l.stat, t: l.t, p: l.p, game_id: l.game_id, label: l.label }
+        : { id: l.id, kind: "game", date: S.slate.date, game_id: l.game_id, leg: l.leg, p: l.p, label: l.label, matchup: l.matchup });
+      store("slip", S.slip); S.tab = "slip"; render(); window.scrollTo(0, 0); return; }
+    if (t.dataset.rm) { S.slip = S.slip.filter((l) => l.id !== t.dataset.rm); store("slip", S.slip); render(); return; }
+    if (t.id === "clear") { S.slip = []; store("slip", S.slip); render(); return; }
+    if (t.id === "save") { S.saved.push({ date: S.slate.date, legs: S.slip, p: S.slip.reduce((a, l) => a * l.p, 1), saved: Date.now() });
+      store("saved", S.saved); S.slip = []; store("slip", S.slip); toast("Saved. Check the Record tab after the games."); S.tab = "record"; loadRecord(); render(); return; }
+    if (t.id === "copy") { const ta = $("#copytext"); const txt = ta.value;
+      const fallback = () => { ta.hidden = false; ta.select(); toast("Text selected, copy it"); };
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Copied"), fallback); else fallback(); return; }
+    if (t.dataset.del) { S.saved.splice(+t.dataset.del, 1); store("saved", S.saved); render(); return; }
+  });
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "fgame") { S.game = e.target.value; render(); }
+    if (e.target.id === "fgrade") { S.grade = e.target.value; render(); }
+    if (e.target.id === "day") loadDay(e.target.value);
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "fq") { S.q = e.target.value; const pos = e.target.selectionStart; render(); const f = $("#fq"); f.focus(); f.setSelectionRange(pos, pos); }
+  });
+
+  async function loadRecord() {
+    S.history = (await getJSON("data/history.json")) || {};
+    const dates = [...new Set(S.saved.map((s) => s.date))];
+    await Promise.all(dates.map(async (d) => { if (!S.results[d]) { const r = await getJSON(`data/results/${d}.json`); if (r) S.results[d] = r; } }));
+    if (S.tab === "record") render();
+  }
+  async function loadDay(d) {
+    S.slate = d ? await getJSON(`data/slates/${d}.json`) : await getJSON("data/latest.json");
+    S.game = "all"; render();
+  }
+  async function init() {
+    const idx = (await getJSON("data/index.json")) || { slates: [] };
+    S.slate = await getJSON("data/latest.json");
+    const sel = $("#day"); const days = idx.slates.slice().reverse().slice(0, 30);
+    sel.innerHTML = days.map((d) => `<option value="${d}" ${S.slate && S.slate.date === d ? "selected" : ""}>${new Date(d + "T12:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</option>`).join("");
+    if (!days.length) sel.hidden = true;
+    render(); loadRecord();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
